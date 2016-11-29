@@ -12,8 +12,6 @@ default['bcpc']['openstack_release'] = "liberty"
 default['bcpc']['openstack_branch'] = "proposed"
 # Should be kvm (or qemu if testing in VMs that don't support VT-x)
 default['bcpc']['virt_type'] = "kvm"
-# Define the kernel to be installed. By default, track latest LTS kernel
-default['bcpc']['preseed']['kernel'] = "linux-image-generic-lts-trusty"
 # Define a specific kernel version to have GRUB default to (if non-nil)
 # - specify kernel like pattern "3.13.0-61-generic"
 # - a wrong pattern here will result in Chef convergence failure

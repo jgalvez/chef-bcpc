@@ -1,4 +1,3 @@
-
 ###########################################
 #
 # defaults for the bcpc.bootstrap settings
@@ -18,6 +17,16 @@ default['bcpc']['bootstrap']['mirror_path'] = "/ubuntu"
 # non-standard path
 #default['bcpc']['bootstrap']['mirror']      = "mirror.cc.columbia.edu"
 #default['bcpc']['bootstrap']['mirror_path'] = "/pub/linux/ubuntu/archive"
+
+# Define the kernel to be installed by preseed. By default, track current HWE kernel
+default['bcpc']['bootstrap']['preseed_kernel'] = "linux-image-virtual-lts-xenial"
+
+# Device to install to for legacy BIOS installations
+default['bcpc']['bootstrap']['bios_boot_device'] = '/dev/sda'
+
+# Device to install to for UEFI installations
+default['bcpc']['bootstrap']['uefi_boot_device'] = '/dev/nvme0n1'
+
 
 
 ###########################################
