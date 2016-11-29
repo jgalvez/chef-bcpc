@@ -24,10 +24,11 @@ default['bcpc']['bootstrap']['preseed_kernel'] = "linux-image-virtual-lts-xenial
 # Device to install to for legacy BIOS installations
 default['bcpc']['bootstrap']['bios_boot_device'] = '/dev/sda'
 
+# Cobbler profile to use for UEFI
+default['bcpc']['bootstrap']['uefi_profile'] = 'bcpc_host_uefi'
+
 # Device to install to for UEFI installations
 default['bcpc']['bootstrap']['uefi_boot_device'] = '/dev/nvme0n1'
-
-
 
 ###########################################
 #
