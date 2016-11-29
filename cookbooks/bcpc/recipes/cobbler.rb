@@ -58,6 +58,13 @@ template "/etc/cobbler/dhcp.template" do
     notifies :run, "bash[run-cobbler-sync]", :immediately
 end
 
+cookbook_file '/var/lib/tftpboot/grubnetx64.efi' do
+  source   'grubnetx64.efi'
+  cookbook 'bcpc-binary-files'
+  owner    'root'
+  mode     '00444'
+end
+
 node['bcpc']['cobbler']['kickstarts'].each do |kickstart|
   template "/var/lib/cobbler/kickstarts/#{kickstart}" do
     source "cobbler.#{kickstart}.erb"
