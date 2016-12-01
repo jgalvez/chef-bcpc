@@ -158,6 +158,7 @@ end
 
 service "cobbler" do
     action [:enable, :start]
+    restart_command "service cobbler restart; sleep 5"
 end
 
 bash "run-cobbler-sync" do
