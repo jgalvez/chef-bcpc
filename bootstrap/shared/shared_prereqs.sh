@@ -117,7 +117,6 @@ mkdir -p $BOOTSTRAP_CACHE_DIR/cookbooks
 cleanup_and_download_cookbook apt ${VER_APT_COOKBOOK}
 cleanup_and_download_cookbook chef-client ${VER_CHEF_CLIENT_COOKBOOK}
 cleanup_and_download_cookbook chef_handler ${VER_CHEF_HANDLER_COOKBOOK}
-cleanup_and_download_cookbook concat ${VER_CONCAT_COOKBOOK}
 cleanup_and_download_cookbook cron ${VER_CRON_COOKBOOK}
 cleanup_and_download_cookbook hostsfile ${VER_HOSTSFILE_COOKBOOK}
 cleanup_and_download_cookbook logrotate ${VER_LOGROTATE_COOKBOOK}
