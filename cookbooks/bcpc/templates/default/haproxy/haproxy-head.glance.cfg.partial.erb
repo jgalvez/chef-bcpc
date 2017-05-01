@@ -1,0 +1,19 @@
+listen glance-api
+  bind <%=node['bcpc']['management']['vip']%>:9292 <%= (node['bcpc']['protocol']['glance'] == 'https') ? "ssl crt /etc/haproxy/haproxy.pem" : "" %>
+  balance source
+  option tcplog
+  option httpchk GET /
+  http-check expect status 300
+<% @servers.each do |server| -%>
+  <%= "server #{server['hostname']} #{server['bcpc']['management']['ip']}:9292 check inter 5s rise 1 fall 1" %>
+<% end -%>
+
+listen glance-registry
+  bind <%=node['bcpc']['management']['vip']%>:9191 <%= (node['bcpc']['protocol']['glance'] == 'https') ? "ssl crt /etc/haproxy/haproxy.pem" : "" %>
+  balance source
+  option tcplog
+  option httpchk GET /
+  http-check expect status 401
+<% @servers.each do |server| -%>
+  <%= "server #{server['hostname']} #{server['bcpc']['management']['ip']}:9191 check inter 5s rise 1 fall 1" %>
+<% end -%>

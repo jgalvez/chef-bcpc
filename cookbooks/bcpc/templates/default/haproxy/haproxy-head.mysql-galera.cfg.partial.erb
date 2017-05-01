@@ -1,0 +1,13 @@
+listen mysql-galera
+  bind <%=node['bcpc']['management']['vip']%>:3306
+  timeout client 24h
+  timeout server 24h
+  mode tcp
+  balance leastconn
+  option tcplog
+  option tcpka
+  option httpchk
+  option nolinger
+<% @servers.each do |server| -%>
+  <%= "server #{server['hostname']} #{server['bcpc']['management']['ip']}:3306 check port 3307 inter 5s rise 1 fall 1 observe layer4 backup" %>
+<% end -%>

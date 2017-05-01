@@ -1,0 +1,18 @@
+frontend radosgw-http
+  bind <%="#{node['bcpc']['floating']['vip']}:#{node['bcpc']['ports']['haproxy']['radosgw']}"%>
+  option tcplog
+  default_backend radosgw-http-backend
+
+frontend radosgw-https
+  bind <%="#{node['bcpc']['floating']['vip']}:#{node['bcpc']['ports']['haproxy']['radosgw_https']}"%> ssl crt /etc/haproxy/haproxy.s3.pem
+  option tcplog
+  default_backend radosgw-http-backend
+
+backend radosgw-http-backend
+  balance leastconn
+  option httpchk GET /
+  http-check expect status 200
+  source <%=node['bcpc']['floating']['vip']%>
+<% @radosgw_servers.each do |server| -%>
+  <%= "server #{server['hostname']} #{server['bcpc']['floating']['ip']}:#{node['bcpc']['ports']['radosgw']} check inter 5s rise 1 fall 1 observe layer7" %>
+<% end -%>

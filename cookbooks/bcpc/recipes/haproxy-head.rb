@@ -22,24 +22,79 @@ include_recipe "bcpc::default"
 include_recipe "bcpc::xinetd"
 include_recipe "bcpc::haproxy-common"
 
-concat_fragment "haproxy-main-config" do
-  order  "001"
-  target "/etc/haproxy/haproxy.cfg"
-  source "haproxy-head.cfg.erb"
+template "/etc/haproxy/haproxy.cfg" do
+  # TODO: may need to move this def
+  source "haproxy/haproxy-head.cfg.erb"
   variables(
     lazy {
       {
+        :partials => {
+          "haproxy/haproxy-head.mysql-galera.cfg.partial.erb" => {
+            "cookbook" => "bcpc",
+            "variables" => {
+              :servers => get_head_nodes
+            }
+          },
+          "haproxy/haproxy-head.keystone.cfg.partial.erb" => {
+              "cookbook" => "bcpc",
+              "variables" => {
+                :servers => get_head_nodes
+              }
+          },
+          "haproxy/haproxy-head.glance.cfg.partial.erb" => {
+              "cookbook" => "bcpc",
+              "variables" => {
+                :servers => get_head_nodes
+              }
+          },
+          "haproxy/haproxy-head.cinder.cfg.partial.erb" => {
+              "cookbook" => "bcpc",
+              "variables" => {
+                :servers => get_head_nodes
+              }
+          },
+          "haproxy/haproxy-head.nova.cfg.partial.erb" => {
+              "cookbook" => "bcpc",
+              "variables" => {
+                :servers => get_head_nodes
+              }
+          },
+          "haproxy/haproxy-head.heat.cfg.partial.erb" => {
+              "cookbook" => "bcpc",
+              "variables" => {
+                :servers => get_head_nodes
+              }
+          },
+          "haproxy/haproxy-head.novnc.cfg.partial.erb" => {
+              "cookbook" => "bcpc",
+              "variables" => {
+                :servers => get_head_nodes
+              }
+          },
+          "haproxy/haproxy-head.horizon.cfg.partial.erb" => {
+              "cookbook" => "bcpc",
+              "variables" => {
+                :servers => get_head_nodes
+              }
+          },
+          "haproxy/haproxy-head.rabbitmq.cfg.partial.erb" => {
+              "cookbook" => "bcpc",
+              "variables" => {
+                :servers => get_head_nodes
+              }
+          },
+          "haproxy/haproxy-head.radosgw.cfg.partial.erb" => {
+              "cookbook" => "bcpc",
+              "variables" => {
+                :servers => get_head_nodes,
+                :radosgw_servers => search_nodes('recipe', 'ceph-rgw')
+              }
+          }
+        },
         :servers => get_head_nodes,
-        :radosgw_servers => search_nodes('recipe', 'ceph-rgw')
       }
     }
   )
-end
-
-concat "/etc/haproxy/haproxy.cfg" do
-  mode 00644
-  owner 'root'
-  group 'root'
   notifies :restart, "service[haproxy]", :immediately
   notifies :restart, "service[xinetd]", :immediately
 end

@@ -1,0 +1,13 @@
+listen cinder-api
+  bind <%=node['bcpc']['management']['vip']%>:8776 <%= (node['bcpc']['protocol']['cinder'] == 'https') ? "ssl crt /etc/haproxy/haproxy.pem" : "" %>
+  balance source
+  option tcplog
+  option httpchk GET /
+<% if is_liberty? %>
+  http-check expect status 200
+<% else %>
+  http-check expect status 300
+<% end %>
+<% @servers.each do |server| -%>
+  <%= "server #{server['hostname']} #{server['bcpc']['management']['ip']}:8776 check inter 5s rise 1 fall 1" %>
+<% end -%>
