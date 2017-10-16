@@ -1,0 +1,17 @@
+# pull in the bootstrap config defaults and overrides (even though these would already
+# be set by BOOT_GO.sh, do it again here so that Vagrant always has access to all
+# configuration variables)
+def extract_and_export_envvar(line)
+  matches = line.match(/^\s*(?!#)(export |)(?<name>.+)=(?<value>.+)$/)
+  unless matches.nil?
+    name, value = matches[:name], matches[:value]
+    # this blob interpolates existing environment variables in
+    interpolated_value = value.dup
+    envvars_to_interpolate = interpolated_value.scan /\$\w+/
+    envvars_to_interpolate.flatten.each {|v| interpolated_value.gsub!(v, ENV[v.tr('$', '')])}
+    explanation = (ENV[name] ? "Overriding " : "Setting ") + "#{name} = #{interpolated_value}"
+    explanation << " (originally #{value})" if interpolated_value != value
+    # puts explanation
+    ENV[name] = interpolated_value
+  end
+end

@@ -7,28 +7,14 @@ require 'uri' # used to parse the local mirror if one is given
 
 Vagrant.require_version ">= 1.7.0"
 ENV['VAGRANT_DEFAULT_PROVIDER'] = 'virtualbox'
+INCLUDE_DIR = 'Vagrantfile.d'
 
 # if being run via BOOT_GO.sh, ENV['REPO_ROOT'] will be the root of the repo;
 # if it is not set, set it ourselves
 ENV['REPO_ROOT'] ||= %x{git rev-parse --show-toplevel}.strip
 
-# pull in the bootstrap config defaults and overrides (even though these would already
-# be set by BOOT_GO.sh, do it again here so that Vagrant always has access to all
-# configuration variables)
-def extract_and_export_envvar(line)
-  matches = line.match(/^\s*(?!#)(export |)(?<name>.+)=(?<value>.+)$/)
-  unless matches.nil?
-    name, value = matches[:name], matches[:value]
-    # this blob interpolates existing environment variables in
-    interpolated_value = value.dup
-    envvars_to_interpolate = interpolated_value.scan /\$\w+/
-    envvars_to_interpolate.flatten.each {|v| interpolated_value.gsub!(v, ENV[v.tr('$', '')])}
-    explanation = (ENV[name] ? "Overriding " : "Setting ") + "#{name} = #{interpolated_value}"
-    explanation << " (originally #{value})" if interpolated_value != value
-    # puts explanation
-    ENV[name] = interpolated_value
-  end
-end
+# load the libraries
+load "#{INCLUDE_DIR}/lib.vagrantfile"
 
 config_path = File.join ENV['REPO_ROOT'], 'bootstrap', 'config'
 config_defaults = File.join(config_path, 'bootstrap_config.sh.defaults')
@@ -46,138 +32,13 @@ end
 # list any package names to be automatically removed here
 $packages_to_remove = []
 
-# if a directory with additional CA certs is provided, test each file in there to
-# verify that it's a certificate ending in .crt (due to update-ca-certificates restrictions)
-# and then add it to a script to be run inside each VM
-# script will also test the file to see if it appears to contain multiple certificates,
-# which update-ca-certificates does not seem to handle reliably
-$update_ca_certificates_script = ""
-unless ENV['BOOTSTRAP_ADDITIONAL_CACERTS_DIR'].nil? or ENV['BOOTSTRAP_ADDITIONAL_CACERTS_DIR'].empty?
-  cacerts_dir = Dir.new(ENV['BOOTSTRAP_ADDITIONAL_CACERTS_DIR'])
-  files_in_cacerts_dir = cacerts_dir.entries.select{|e| not ['.', '..'].include? e}
-  files_in_cacerts_dir.each do |f|
-    next if File.directory?(File.join(cacerts_dir, f))
-    begin
-      unless f.end_with? '.crt'
-        fail "All files in #{ENV['BOOTSTRAP_ADDITIONAL_CACERTS_DIR']} must end in .crt due to update-ca-certificates restrictions."
-      end
-      # read in the certificate and normalize DOS line endings to UNIX
-      cert_raw = File.read(File.join(ENV['BOOTSTRAP_ADDITIONAL_CACERTS_DIR'], f)).gsub(/\r\n/, "\n")
-      if cert_raw.scan('-----BEGIN CERTIFICATE-----').length > 1
-        fail "Multiple certificates detected in #{File.join(ENV['BOOTSTRAP_ADDITIONAL_CACERTS_DIR'], f)}, please split them into separate certificates."
-      end
-      cert = OpenSSL::X509::Certificate.new(cert_raw) # test that the cert is valid
-      dest_cert_path = File.join('/usr/local/share/ca-certificates', f)
-      $update_ca_certificates_script << <<-EOH
-        echo -ne "#{cert_raw}" > #{dest_cert_path}
-      EOH
-    rescue OpenSSL::X509::CertificateError
-      fail "Certificate #{File.join(ENV['BOOTSTRAP_ADDITIONAL_CACERTS_DIR'], f)} is not a valid PEM certificate, aborting."
-    end
-  end
-  $update_ca_certificates_script << <<-EOH
-    update-ca-certificates
-  EOH
-end
+# load the provisioners
+load "#{INCLUDE_DIR}/provisioners.vagrantfile"
 
-# if proxies are provided, configure them before configuring any local mirror override
-# RUN THIS SCRIPT WITH sudo AND privileged = false so that $HOME is set to the
-# value of the non-root user
-$proxy_configuration_script = <<-EOH
-  sudo touch /etc/apt/apt.conf
-  touch $HOME/proxy_config.sh
-EOH
-# some ugliness for legacy configs
-BOOTSTRAP_HTTP_PROXY_URL = URI(ENV['BOOTSTRAP_HTTP_PROXY_URL'] || 'http://%s' % ENV['BOOTSTRAP_HTTP_PROXY'])
-BOOTSTRAP_HTTPS_PROXY_URL = URI(ENV['BOOTSTRAP_HTTPS_PROXY_URL'] || 'http://%s' % ENV['BOOTSTRAP_HTTPS_PROXY'])
-unless BOOTSTRAP_HTTP_PROXY_URL.host.nil?
-  $proxy_configuration_script << <<-EOH
-    echo 'Acquire::http::Proxy "#{BOOTSTRAP_HTTP_PROXY_URL.to_s}";' | sudo tee -a /etc/apt/apt.conf
-    echo 'export http_proxy=#{BOOTSTRAP_HTTP_PROXY_URL.to_s}' | tee -a $HOME/proxy_config.sh
-  EOH
-end
-unless BOOTSTRAP_HTTPS_PROXY_URL.host.nil?
-  $proxy_configuration_script << <<-EOH
-    echo 'Acquire::https::Proxy "#{BOOTSTRAP_HTTPS_PROXY_URL.to_s}";' | sudo tee -a /etc/apt/apt.conf
-    echo 'export https_proxy=#{BOOTSTRAP_HTTPS_PROXY_URL.to_s}' | tee -a $HOME/proxy_config.sh
-    mkdir -p $HOME/.pip
-    printf "[global]\nproxy = #{BOOTSTRAP_HTTPS_PROXY_URL.to_s}\n" > $HOME/.pip/pip.conf
-  EOH
-end
-
-# this script tests proxy servers from inside the bootstrap node
-$testing_proxy_servers_script = <<-EOH
-  . $HOME/proxy_config.sh
-  FAILED=0
-  HTTP_PROXY_TEST=$(curl http://www.google.com 2>&1)
-  if [[ $? != 0 ]]; then
-    echo "HTTP proxy test failed, check HTTP proxy configuration:"
-    echo -e "$HTTP_PROXY_TEST"
-    FAILED=1
-  fi
-  HTTPS_PROXY_TEST=$(curl https://github.com 2>&1)
-  if [[ $? != 0 ]]; then
-    echo -e "HTTPS proxy test failed, check HTTPS proxy configuration and SSL certificates:"
-    echo -e "$HTTPS_PROXY_TEST"
-    FAILED=1
-  fi
-  exit $FAILED
-EOH
-
-# compute the repository configuration script
-$repos_script = <<-EOH
-  #!/bin/bash
-  hash -r
-  install -d -m0755 -g adm /var/log/vagrant
-  exec &>>/var/log/vagrant/provision.log
-  date --rfc-3339=s
-EOH
-
-unless ENV['BOOTSTRAP_APT_MIRROR'].nil? or ENV['BOOTSTRAP_APT_MIRROR'].empty?
-  local_mirror_host = URI(ENV['BOOTSTRAP_APT_MIRROR']).host
-  fail "#{ENV['BOOTSTRAP_APT_MIRROR']} is an invalid URL, aborting build" if local_mirror_host.nil?
-  $repos_script << <<-EOH
-    cp /etc/apt/sources.list /etc/apt/sources.list.bak
-    sed -i 's|http://archive\.ubuntu\.com/ubuntu|#{ENV['BOOTSTRAP_APT_MIRROR']}|g' /etc/apt/sources.list
-    sed -i 's|http://security\.ubuntu\.com/ubuntu|#{ENV['BOOTSTRAP_APT_MIRROR']}|g' /etc/apt/sources.list
-    sed -i s/^deb-src/\#deb-src/g /etc/apt/sources.list
-    touch /etc/apt/apt.conf
-    echo 'Acquire::http::Proxy::#{local_mirror_host} "DIRECT";' | tee -a /etc/apt/apt.conf
-  EOH
-end
-
-# try to apt-get update immediately so that the bootstrap does not wander along for a while
-# and waste everyone's time in case our repo configuration set above is broken
-$repos_script << <<-EOH
-  apt-get update
-  apt-get -y autoremove
-EOH
-# END repository configuration script
-
-# since these boxes do not come with swap, this script will add a swap file on disk
-# (repartionining /dev/sda would be a dreadful chore)
-$add_swap_script = <<-EOH
-  #!/bin/bash
-  swap_path='/swap'
-  swap_size="#{ENV['VM_SWAP_SIZE'] ||= 8192}M"
-  # This could be a re-provision
-  if grep -qw "^${swap_path}" /proc/swaps ; then
-    swapoff "$swap_path"
-  fi
-  fallocate -l $swap_size "$swap_path"
-  truncate -s $swap_size "$swap_path"
-  chmod 600 "$swap_path"
-  mkswap -f "$swap_path"
-  /bin/sync
-  swapon "$swap_path"
-  if ! grep -qw "^${swap_path}" /etc/fstab ; then
-    echo "$swap_path none swap defaults 0 0" | tee -a /etc/fstab
-  fi
-EOH
-
+DEFAULT_NUM_NODES = 3
+cluster_nodes = (ENV['CLUSTER_NODES'] || DEFAULT_NUM_NODES).to_i
 Vagrant.configure("2") do |config|
   # build list of all machines to provision at once
-  cluster_nodes = 3
   monitoring_node_count = ENV['MONITORING_NODES'].to_i
   # nil.to_i is 0, so no need to check for nil explicitly
   unless monitoring_node_count == 0
@@ -303,8 +164,7 @@ Vagrant.configure("2") do |config|
         # this is an unpleasing hack to locate the VM on disk, so that additional disks can be stored with it
         # this assumes that all VMs will be going into the default VirtualBox folder
         begin
-          default_vm_config_file = %x[VBoxManage list systemproperties | grep 'Default machine folder']
-          default_vm_loc = default_vm_config_file.match(/^Default machine folder:\s+(.+)$/)[1]
+          default_vm_loc = %x[VBoxManage list systemproperties | awk 'BEGIN{FS=":"}/^Default machine folder/{sub(/^ +/,"",$2);print $2}']
           vm_dir = File.join(default_vm_loc, vm)
         rescue
           fail "Unable to locate VM #{vm} on disk, terminating"
