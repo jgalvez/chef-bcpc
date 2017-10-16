@@ -68,6 +68,12 @@ export BOOTSTRAP_CACHE_DIR=$HOME/.bcpc-cache
 # environments/repository_template.json for a template to put your own mirror paths into).
 export BOOTSTRAP_APT_MIRROR=
 
+# Sets the *total* number of non-bootstrap nodes
+export CLUSTER_NODES=3
+
+# Sets the number of Head nodes
+export CLUSTER_HEADS=1
+
 # Sets the number of monitoring VMs to bootstrap. Please ensure you have
 # sufficient hardware resources to run these additional VMs.
 # Valid range is 0-3 (default 0).
