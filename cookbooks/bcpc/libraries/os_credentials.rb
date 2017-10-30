@@ -15,9 +15,11 @@ end
 def user_context_from_file(filename)
   cmd = "env - /bin/bash -c '. #{filename} && printenv'"
   res = %x( #{cmd} )
-  return {} if res.empty?
+  return nil if res.empty?
   # split by '=' and create the hash
-  Hash[ *(res.split("\n").collect {|stmt| var,name = stmt.split('=') }.flatten) ]
+  Hash[ *(res.split("\n").collect {|stmt| var,name = stmt.split('=') }.flatten) ].tap {|obj|
+    return nil if obj.empty?
+  }
 end
 
 # TODO(kamidzi): quite messy..
@@ -45,12 +47,13 @@ def user_context_from_memory(username)
     'OS_IMAGE_API_VERSION' => get_api_version(:image),
     'OS_COMPUTE_API_VERSION' => get_api_version(:compute),
     'OS_VOLUME_API_VERSION' => get_api_version(:volume),
-    'OS_NO_CACHE' => 1,
+    'OS_NO_CACHE' => '1',
   }
 
   # prefer the local admin
   user_context_mapping = {
     'admin' => default_env.merge({
+      'OS_USERNAME' => 'admin',
       'OS_PASSWORD' => get_config('keystone-local-admin-password'),
     })
   }
@@ -89,9 +92,9 @@ end
 
 # For that admin context. For other admin users, can call
 # user_context(admin_name) { commands }
-def admin_context(&block)
+def admin_context(driver=:file, &block)
   username='admin'
-  user_context(username) do
+  user_context(username, driver) do
     yield
   end
 end
