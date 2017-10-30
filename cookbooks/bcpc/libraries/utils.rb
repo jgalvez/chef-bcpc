@@ -426,7 +426,7 @@ end
 def cmdline_env_args(environ)
   ret = ['env']
   ret + environ.collect {|k,v|
-    v = ("\"" + v + "\"") if v.match(/ /)
+    v = "\"#{v}\"" if v.to_s.match(/ /)
     "#{k}=#{v}"
   }.flatten
 end
