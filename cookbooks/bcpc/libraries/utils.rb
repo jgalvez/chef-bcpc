@@ -430,3 +430,9 @@ def cmdline_env_args(environ)
     "#{k}=#{v}"
   }.flatten
 end
+
+def user_context_to_vars(username, driver=:file, filter=Proc.new {|x| x})
+  auth = user_context(username, driver)
+  val_pairs = auth.collect {|tuple| filter.call(tuple) }.flatten
+  auth_vars = Hash[ *val_pairs ]
+end
