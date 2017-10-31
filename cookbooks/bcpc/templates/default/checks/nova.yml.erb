@@ -1,7 +1,16 @@
 ---
-tenant: <%=@node['bcpc']['keystone']['admin_tenant']%>
-user: '<%="#{get_config('keystone-admin-user')}"%>'
-password: '<%="#{get_config('keystone-admin-password')}"%>'
-auth_url: https://<%="#{node[:bcpc][:management][:vip]}"%>:5000/v2.0/
+<%
+  auth = user_context('admin')
+  val_pairs = auth.collect {|name,val|
+    [
+      name.to_s.downcase.gsub(/^os_/,''),
+      val
+    ]
+  }.flatten
+  auth_vars = Hash[ *val_pairs ]
+%>
+<%- auth_vars.each do |name, val| %>
+<%= name %>: <%= val %>
+<% end %>
 timeout: 300
 cluster: <%=@node['bcpc']['region_name']%>
