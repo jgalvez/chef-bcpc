@@ -17,7 +17,9 @@ def user_context_from_file(filename)
   res = %x( #{cmd} )
   return nil if res.empty?
   # split by '=' and create the hash
-  Hash[ *(res.split("\n").collect {|stmt| var,name = stmt.split('=') }.flatten) ].tap {|obj|
+  Hash[ *(res.split("\n").collect {|stmt|
+    var,name = stmt.split('=') }.select {|name, val| name.match /^OS/ }.flatten)
+  ].tap {|obj|
     return nil if obj.empty?
   }
 end
